@@ -1,5 +1,5 @@
 library(dplyr)
-x<-read.csv2("D:/Documentos (D)/UFJF/9-PERIODO/Amostragem 2/Leitos_2026.csv",encoding="Latin1")%>%
+x<-read.csv2("Leitos_2026.csv",encoding="Latin1")%>%
   filter(UF=="MG")
 x$DESC_NATUREZA_JURIDICA[x$DESC_NATUREZA_JURIDICA=="HOSPITAL_FILANTR\xd3PICO"] <- "HOSPITAL_FILANTROPICO"
 x$DESC_NATUREZA_JURIDICA[x$DESC_NATUREZA_JURIDICA=="HOSPITAL_P\xdaBLICO"] <- "HOSPITAL_PUBLICO"
