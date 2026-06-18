@@ -16,4 +16,4 @@ set.seed(65)
 s <- sample(1:nrow(x),size=200,replace=T)
 amostra <- x[s,]
 amostra <- amostra %>%
-  select(c("MUNICIPIO","CNES","NOME_ESTABELECIMENTO","DESC_NATUREZA_JURIDICA","LEITOS_SUS"))
+  select(c("MUNICIPIO","CNES","NOME_ESTABELECIMENTO","DESC_NATUREZA_JURIDICA","LEITOS_SUS","LEITOS_EXISTENTES"))

@@ -1,0 +1,12 @@
+---
+output: 
+  pdf_document:
+    includes:
+      before_body: title.sty
+---
+
+\newpage
+
+\pagenumbering{arabic}
+
+# Objetivo
