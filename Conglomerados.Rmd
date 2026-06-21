@@ -1,0 +1,82 @@
+---
+title: "Amostragem por conglomerados"
+author: "Kailany Aline"
+date: "2026-06-21"
+output: 
+      pdf_document:
+        latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Amostragem por Conglomerados
+
+Neste tópico, propomos considerar cada **hospital como um conglomerado**, no
+qual os leitos a ele pertencentes são os elementos agrupados dentro dessa
+unidade. Essa escolha se justifica porque o leito, diferente do hospital, não
+possui um cadastro próprio que permita seu sorteio direto: ele só existe
+agrupado dentro de um estabelecimento, conforme o listado pelo @datasus2026.
+Assim, ao invés de sortear leitos individualmente, sorteiam-se hospitais inteiros, e as
+informações de interesse passam a ser medidas a partir dos leitos contidos em
+cada hospital sorteado. Essa mudança de unidade primária de sorteio (de leito
+para hospital) tem implicações diretas sobre a definição de população e
+unidade amostral, discutidas a seguir em dois cenários.
+
+## Informações mensuráveis dentro de cada conglomerado
+
+Uma vez sorteado um hospital, diversas informações podem ser levantadas a partir
+dos leitos nele contidos, todas já presentes na base do DataSUS:
+
+- Número total de leitos existentes no hospital;
+- Número de leitos vinculados ao SUS e a proporção SUS/total dentro do
+  conglomerado;
+- Composição por tipo de leito de UTI (adulto, pediátrico, neonatal, coronariano
+  e de queimados), quando o hospital possui esse tipo de estrutura;
+- Natureza jurídica do hospital (público, privado ou filantrópico), que pode ser
+  usada para caracterizar o conglomerado, ainda que não seja, ela própria, uma
+  variável medida *dentro* do conglomerado.
+
+Note-se que, ao contrário dos leitos, nem todo hospital possui UTI: na base de
+janeiro de 2026, apenas 222 dos 662 hospitais mineiros (≈34%) registram ao menos
+um leito de UTI. Isso indica que os conglomerados tendem a ser heterogêneos entre
+si (hospitais com e sem UTI) mas relativamente homogêneos internamente quanto à
+presença desse tipo de leito, característica típica da amostragem por
+conglomerados, que costuma elevar a variância do estimador em relação a uma
+amostragem direta dos leitos, justamente por essa homogeneidade interna.
+
+## Cenário A — Hospital como conglomerado de leitos (estágio único)
+
+Neste cenário, todos os leitos de um hospital sorteado são considerados,
+não havendo subamostragem dentro do conglomerado.
+
+- **População redefinida:** conjunto dos 662 hospitais mineiros cadastrados no
+  DataSUS em janeiro de 2026, cada um agregando seu respectivo número de leitos.
+- **Unidade amostral primária (e única):** o hospital (conglomerado), que
+  substitui o leito como unidade de sorteio.
+- **Unidade de observação:** todos os leitos pertencentes ao hospital sorteado,
+  dos quais se extrai o total de leitos, a proporção de leitos SUS e a
+  composição de UTIs daquele hospital.
+
+Esse desenho elimina a necessidade de uma listagem de leitos individuais, bastando a listagem de hospitais já disponível na base, o que facilita sua implementação.
+
+## Cenário B — Hospital como conglomerado, com subamostragem de leitos (dois estágios)
+
+Alternativamente, pode-se subamostrar leitos dentro de cada hospital sorteado,
+sobretudo se o objetivo for medir uma característica que exija inspeção
+individual de cada leito (por exemplo, ocupação real no momento da coleta), e
+não apenas a contagem já disponível no cadastro.
+
+- **População redefinida:** conjunto de todos os leitos mineiros, agrupados em
+  662 conglomerados (hospitais).
+- **Unidade amostral primária:** o hospital, sorteado em um primeiro
+  estágio.
+- **Unidade amostral secundária:** o leito individual, sorteado em um
+  segundo estágio dentro de cada hospital selecionado no primeiro estágio.
+
+Esse desenho é mais custoso de implementar, pois exige uma listagem de leitos
+dentro de cada hospital sorteado, algo que a base do DataSUS não fornece
+diretamente, mas permite controlar o tamanho total da amostra de leitos sem
+depender do porte de cada hospital sorteado, sendo mais adequado caso a
+variável de interesse não esteja disponível de forma agregada no cadastro.
