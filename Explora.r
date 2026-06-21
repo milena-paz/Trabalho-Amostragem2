@@ -5,7 +5,7 @@ x$DESC_NATUREZA_JURIDICA[x$DESC_NATUREZA_JURIDICA=="HOSPITAL_FILANTR\xd3PICO"] <
 x$DESC_NATUREZA_JURIDICA[x$DESC_NATUREZA_JURIDICA=="HOSPITAL_P\xdaBLICO"] <- "HOSPITAL_PUBLICO"
 
 x <- x %>%
-  select(!c("REGIAO","UF","MOTIVO_DESABILITACAO","NO_EMAIL","CO_CEP","NO_COMPLEMENTO")) %>% 
+  select(c("MUNICIPIO","COMP","CNES","NOME_ESTABELECIMENTO","DESC_NATUREZA_JURIDICA","LEITOS_SUS","LEITOS_EXISTENTES")) %>% 
   filter(COMP==202601) #referente ao mes de janeiro
 
 # populacao de estudo: leitos dos hospitais do estado de minas gerais vinculados ao SUS referentes ao mes de janeiro
