@@ -14,8 +14,6 @@ knitr::opts_chunk$set(echo = FALSE,
 
 \newpage
 
-\pagenumbering{arabic}
-
 # Objetivo
 
 A partir de diversas técnicas de amostragem probabilística, deseja-se obter estimativas relevantes respeito à oferta de leitos totais e disponibilidade de leitos vinculados ao SUS em hospitais de Minas Gerais, com o objetivo de medir a capacidade hospitalar no estado.
@@ -164,7 +162,7 @@ estratos <- data.frame(
   Soma = c(29426, 9926, 10100)
 )
 
-kable(estratos, col.names = c("Estrato", "$N_h$", "Média (leitos)", "Desvio-padrão ($S_h$)", "Soma de leitos"),
+kbl(estratos, col.names = c("Estrato", "$N_h$", "Média (leitos)", "Desvio-padrão ($S_h$)", "Soma de leitos"),
       align = "lcccc", digits = 2, booktabs = TRUE,escape=F,
       caption = "Estatísticas descritivas por estrato (DESC\\_NATUREZA\\_JURIDICA)") %>%
   kable_styling(latex_options = c("hold_position"))
@@ -192,9 +190,9 @@ $$
 estratos$Wh <- c(0.511, 0.207, 0.282)
 estratos$nh_prop <- c(100, 41, 56)
 
-kable(estratos[,c("Estrato","Nh","Wh","nh_prop")],
+kbl(estratos[,c("Estrato","Nh","Wh","nh_prop")],
       col.names = c("Estrato", "$N_h$", "$W_h=N_h/N$", "$n_h$ (proporcional)"),
-      align = "lccc", digits = 3, booktabs = TRUE,
+      align = "lccc", digits = 3, booktabs = TRUE,escape=F,
       caption = "Alocação proporcional entre estratos") %>%
   kable_styling(latex_options = c("hold_position"))
 ```
@@ -213,9 +211,9 @@ $$
 estratos$NhSh <- estratos$Nh*estratos$Sh
 estratos$nh_neyman <- c(111, 40, 46)
 
-kable(estratos[,c("Estrato","Nh","Sh","NhSh","nh_neyman")],
+kbl(estratos[,c("Estrato","Nh","Sh","NhSh","nh_neyman")],
       col.names = c("Estrato", "$N_h$", "$S_h$", "$N_hS_h$", "$n_h$ (Neyman)"),
-      align = "lcccc", digits = 2, booktabs = TRUE,
+      align = "lcccc", digits = 2, booktabs = TRUE,escape=F,
       caption = "Alocação ótima de Neyman entre estratos") %>%
   kable_styling(latex_options = c("hold_position"))
 ```
@@ -249,7 +247,7 @@ amostra_proporcional <- sorteia_estratificada(leitos_mg, nh_prop)
 amostra_neyman        <- sorteia_estratificada(leitos_mg, nh_neyman)
 ```
 
-A média estratificada combinada foi calculada como $\bar{y}_{st}=\sum_h W_h\bar{y}_h$, e sua variância como $\widehat{V}(\bar{y}_{st})=\sum_h W_h^2\cdot(1-n_h/N_h)\cdot s_h^2/n_h$: [AJUSTAR TABELA PARA QUE CAIBA NO DOCUMENTO]
+A média estratificada combinada foi calculada como $\bar{y}_{st}=\sum_h W_h\bar{y}_h$, e sua variância como $\widehat{V}(\bar{y}_{st})=\sum_h W_h^2\cdot(1-n_h/N_h)\cdot s_h^2/n_h$: 
 
 ```{r}
 estima_estratificada <- function(amostra, base, nh_vetor, N, variavel) {
@@ -276,7 +274,7 @@ res_ney  <- estima_estratificada(amostra_neyman, leitos_mg, nh_neyman, N, "LEITO
 
 ```{r, echo=FALSE}
 tab_result <- data.frame(
-  Plano = c("AAS (Parte 2, referência)", "Estratificada — Proporcional", "Estratificada — Neyman"),
+  Plano = c("AAS", "Proporcional", "Neyman"),
   Media = c(78.47, 69.71, 70.87),
   Variancia = c(29.93, 23.00, 23.52),
   IC_inf = c(67.75, 60.31, 61.36),
@@ -284,9 +282,9 @@ tab_result <- data.frame(
   Total = c(51950, 46148, 46916)
 )
 
-kable(tab_result, col.names = c("Plano", "Média estimada", "Variância do estimador",
-                                  "IC 95% (inf.)", "IC 95% (sup.)", "Total estimado"),
-      align = "lccccc", digits = 2, booktabs = TRUE,
+kbl(tab_result, col.names = c("Plano", "Média est.", "Variância do estimador",
+                                  "IC Inf", "IC Sup", "Total est."),
+      align = "lccccc", digits = 2, booktabs = TRUE,escape=F,
       caption = "Comparação entre AAS e amostragem estratificada (proporcional e Neyman)") %>%
   kable_styling(latex_options = c("hold_position"))
 ```
@@ -299,13 +297,13 @@ A leitura da Tabela 4 (estimativas pontuais a partir de uma única realização 
 
 ```{r, echo=FALSE}
 tab_efic <- data.frame(
-  Plano = c("AAS", "Estratificada — Proporcional", "Estratificada — Neyman"),
+  Plano = c("AAS", "Proporcional", "Neyman"),
   Variancia = c(34.25, 33.69, 33.03),
   Reducao_vs_AAS = c("—", "1,6%", "3,6%")
 )
 
-kable(tab_efic, col.names = c("Plano", "Variância teórica $\\widehat{V}(\\bar{y})$", "Redução vs. AAS"),
-      align = "lcc", digits = 2, booktabs = TRUE,
+kable(tab_efic, col.names = c("Plano", "Variância teórica", "Redução vs. AAS"),
+      align = "lcc",digits = 2, booktabs = TRUE,
       caption = "Variância teórica e ganho de eficiência (calculados a partir da população completa)") %>%
   kable_styling(latex_options = c("hold_position"))
 ```
