@@ -53,8 +53,8 @@ Onde:
 Como a proporção $p$ é desconhecida, assumiremos o valor de 0.5 para maximizar a variância (intervalo de confiança conservador). Dessa forma, fixando um erro de estimação de 0.1 obtemos o tamanho de amostra de $n=197$.
 
 
-```{r, include=FALSE}
-library(readr)
+```{r, include=FALSE,message=F}
+library(readr);library(dplyr)
 
 leitos <- read_delim(
   "Leitos_2026.csv",
@@ -66,6 +66,13 @@ leitos <- read_delim(
 leitos_mg <- leitos[leitos$UF == "MG" & leitos$COMP == "202601", ]
 leitos_mg$LEITOS_EXISTENTES <- as.numeric(leitos_mg$LEITOS_EXISTENTES)
 leitos_mg$LEITOS_SUS <- as.numeric(leitos_mg$LEITOS_SUS)
+rm(leitos)
+gc()
+leitos_mg <- leitos_mg %>%
+  select(c("MUNICIPIO","COMP","CNES","NOME_ESTABELECIMENTO","DESC_NATUREZA_JURIDICA","LEITOS_SUS","LEITOS_EXISTENTES")) %>% 
+  filter(COMP==202601) #referente ao mes de janeiro
+leitos_mg$DESC_NATUREZA_JURIDICA <- as.factor(leitos_mg$DESC_NATUREZA_JURIDICA)
+levels(leitos_mg$DESC_NATUREZA_JURIDICA)<- c("FILANTROPICO","PRIVADO","PUBLICO")
 ```
 
 
@@ -141,6 +148,8 @@ variável de interesse não esteja disponível de forma agregada no cadastro.
 
 # 3. Amostragem Estratificada
 
+Este será o desenho escolhido para análise, dado que não temos e nem faz sentido utilizar um listado dos leitos para amostragem por conglomerados, assim como AAS não é efetiva dado que as naturezas jurídicas conferem como estratos com diferentes comportamentos em relação à razão entre leitos SUS e leitos totais.
+
 ## 3.1 Critério de Estratificação
 
 Foi escolhida a variável **natureza jurídica do estabelecimento** (`DESC_NATUREZA_JURIDICA`) como critério de estratificação, dividindo a população de 662 hospitais mineiros (janeiro de 2026) em três estratos: Hospital Filantrópico, Hospital Privado e Hospital Público. A escolha se justifica por três motivos:
@@ -151,7 +160,7 @@ Foi escolhida a variável **natureza jurídica do estabelecimento** (`DESC_NATUR
 
 3. **Variação real e simplicidade operacional:** diferentemente de outras variáveis cadastrais que são quase constantes em Minas Gerais (como `TP_GESTAO`, dominada por um único valor), a natureza jurídica apresenta variação substantiva entre hospitais e é de uso direto no cadastro do CNES, sem necessidade de recodificação.
 
-```{r, echo=FALSE}
+```{r, echo=FALSE,message=F}
 library(kableExtra)
 
 estratos <- data.frame(
@@ -184,7 +193,7 @@ $$
 n_h = n\cdot\frac{N_h}{N}
 $$
 
-É o desenho mais simples e garante representatividade direta de cada grupo dentro do tamanho de amostra original — útil quando não há informação prévia sobre diferenças de variabilidade entre estratos, ou quando se deseja um desenho "neutro" do ponto de vista da estratificação.
+É o desenho mais simples e garante representatividade direta de cada grupo dentro do tamanho de amostra original; útil quando não há informação prévia sobre diferenças de variabilidade entre estratos, ou quando se deseja um desenho "neutro" do ponto de vista da estratificação.
 
 ```{r, echo=FALSE}
 estratos$Wh <- c(0.511, 0.207, 0.282)
@@ -227,7 +236,7 @@ Em cada estrato foi realizado sorteio aleatório simples sem reposição, com os
 ```{r}
 set.seed(2026)
 
-estratos_nomes <- c("HOSPITAL_FILANTRÓPICO", "HOSPITAL_PRIVADO", "HOSPITAL_PÚBLICO")
+estratos_nomes <- levels(leitos_mg$DESC_NATUREZA_JURIDICA)
 
 nh_prop   <- c(100, 41, 56)
 nh_neyman <- c(111, 40, 46)
@@ -255,41 +264,90 @@ estima_estratificada <- function(amostra, base, nh_vetor, N, variavel) {
   Nh <- sapply(names(nh_vetor), function(e) sum(base$DESC_NATUREZA_JURIDICA == e))
 
   yh_bar <- sapply(names(nh_vetor), function(e)
-    mean(amostra[amostra$DESC_NATUREZA_JURIDICA == e, variavel]))
+    mean(amostra[amostra$DESC_NATUREZA_JURIDICA == e,][[variavel]]))
   sh2 <- sapply(names(nh_vetor), function(e)
-    var(amostra[amostra$DESC_NATUREZA_JURIDICA == e, variavel]))
+    var(amostra[amostra$DESC_NATUREZA_JURIDICA == e,][[variavel]]))
 
   ybar_st <- sum(Wh * yh_bar)
   fh <- nh_vetor / Nh
   var_ybar_st <- sum(Wh^2 * (1 - fh) * sh2 / nh_vetor)
 
-  list(ybar = ybar_st, var = var_ybar_st, se = sqrt(var_ybar_st),
-       total = N*ybar_st, var_total = (N^2)*var_ybar_st)
+  return(list(ybar = ybar_st, var = var_ybar_st, se = sqrt(var_ybar_st),
+       total = N*ybar_st, var_total = (N^2)*var_ybar_st))
 }
 
 N <- 662
 res_prop <- estima_estratificada(amostra_proporcional, leitos_mg, nh_prop, N, "LEITOS_EXISTENTES")
 res_ney  <- estima_estratificada(amostra_neyman, leitos_mg, nh_neyman, N, "LEITOS_EXISTENTES")
+lista <- list(res_prop,res_ney)
 ```
 
 ```{r, echo=FALSE}
 tab_result <- data.frame(
   Plano = c("AAS", "Proporcional", "Neyman"),
-  Media = c(78.47, 69.71, 70.87),
-  Variancia = c(29.93, 23.00, 23.52),
-  IC_inf = c(67.75, 60.31, 61.36),
-  IC_sup = c(89.19, 79.11, 80.38),
-  Total = c(51950, 46148, 46916)
+  Media = c(78.47, sapply(lista,function(l) l$ybar)),
+  Variancia = c(29.93, sapply(lista,function(l) l$var)),
+  IC_inf = c(67.75, sapply(lista,function(l) l$ybar)-1.96*sqrt(sapply(lista,function(l) l$var))),
+  IC_sup = c(89.19, sapply(lista,function(l) l$ybar)+1.96*sqrt(sapply(lista,function(l) l$var))),
+  Total = c(51950, sapply(lista,function(l) l$total))
 )
 
-kbl(tab_result, col.names = c("Plano", "Média est.", "Variância do estimador",
+kbl(tab_result, col.names = c("Plano", "Média", "Variância do estimador",
                                   "IC Inf", "IC Sup", "Total est."),
       align = "lccccc", digits = 2, booktabs = TRUE,escape=F,
-      caption = "Comparação entre AAS e amostragem estratificada (proporcional e Neyman)") %>%
+      caption = "Comparação entre AAS e amostragem estratificada (proporcional e Neyman) para leitos existentes" ) %>%
   kable_styling(latex_options = c("hold_position"))
 ```
 
-Para a variável **leitos vinculados ao SUS**, o mesmo procedimento pode ser repetido substituindo `LEITOS_EXISTENTES` por `LEITOS_SUS` na função `estima_estratificada()`[COLOCAR CÓDIGO EM APÊNDICE], mantendo a mesma estrutura de cálculo. 
+Para a variável **leitos vinculados ao SUS**, o mesmo procedimento pode ser repetido:
+
+```{r}
+estima_estratificada <- function(amostra, base, nh_vetor, N, variavel) {
+  Wh <- sapply(names(nh_vetor), function(e) sum(base$DESC_NATUREZA_JURIDICA == e) / N)
+  Nh <- sapply(names(nh_vetor), function(e) sum(base$DESC_NATUREZA_JURIDICA == e))
+
+  yh_bar <- sapply(names(nh_vetor), function(e)
+    mean(amostra[amostra$DESC_NATUREZA_JURIDICA == e,][[variavel]]))
+  sh2 <- sapply(names(nh_vetor), function(e)
+    var(amostra[amostra$DESC_NATUREZA_JURIDICA == e,][[variavel]]))
+
+  ybar_st <- sum(Wh * yh_bar)
+  fh <- nh_vetor / Nh
+  var_ybar_st <- sum(Wh^2 * (1 - fh) * sh2 / nh_vetor)
+
+  return(list(ybar = ybar_st, var = var_ybar_st, se = sqrt(var_ybar_st),
+       total = N*ybar_st, var_total = (N^2)*var_ybar_st))
+}
+res_prop <- estima_estratificada(amostra_proporcional, leitos_mg, nh_prop, N, "LEITOS_SUS")
+res_ney  <- estima_estratificada(amostra_neyman, leitos_mg, nh_neyman, N, "LEITOS_SUS")
+lista <- list(res_prop,res_ney)
+```
+
+```{r, echo=FALSE}
+tab_result <- data.frame(
+  Plano = c("Proporcional", "Neyman"),
+  Media = sapply(lista,function(l) l$ybar),
+  Variancia = sapply(lista,function(l) l$var),
+  IC_inf = sapply(lista,function(l) l$ybar)-1.96*sqrt(sapply(lista,function(l) l$var)),
+  IC_sup = sapply(lista,function(l) l$ybar)+1.96*sqrt(sapply(lista,function(l) l$var)),
+  Total = sapply(lista,function(l) l$total)
+)
+
+kbl(tab_result, col.names = c("Plano", "Média", "Variância do estimador",
+                                  "IC Inf", "IC Sup", "Total est."),
+      align = "lccccc", digits = 2, booktabs = TRUE,escape=F,
+      caption = "Comparação entre amostragem estratificada com alocação proporcional e Neyman para leitos SUS") %>%
+  kable_styling(latex_options = c("hold_position"))
+```
+
+Quanto à proporção de leitos SUS em relação ao núm. de leitos total, temos as seguintes estimativas por estrato:
+
+```{r}
+sapply(estratos_nomes,function(e)
+  p=sum(amostra_neyman$LEITOS_SUS[amostra_neyman$DESC_NATUREZA_JURIDICA == e])/sum(amostra_neyman$LEITOS_EXISTENTES)
+  )
+```
+
 
 ## 3.4 Avaliação da Eficiência
 
@@ -299,7 +357,7 @@ A leitura da Tabela 4 (estimativas pontuais a partir de uma única realização 
 tab_efic <- data.frame(
   Plano = c("AAS", "Proporcional", "Neyman"),
   Variancia = c(34.25, 33.69, 33.03),
-  Reducao_vs_AAS = c("—", "1,6%", "3,6%")
+  Reducao_vs_AAS = c("-", "1,6%", "3,6%")
 )
 
 kable(tab_efic, col.names = c("Plano", "Variância teórica", "Redução vs. AAS"),
@@ -310,8 +368,8 @@ kable(tab_efic, col.names = c("Plano", "Variância teórica", "Redução vs. AAS
 
 Aqui a relação teoricamente esperada se confirma: $\widehat{V}(\bar{y}_{Neyman})\leq\widehat{V}(\bar{y}_{proporcional})\leq\widehat{V}(\bar{y}_{AAS})$. Entretanto, o ganho de eficiência é **modesto** apenas 1,6% para a alocação proporcional e 3,6% para Neyman, frente à AAS. Esse resultado, embora menos expressivo do que se poderia esperar de uma estratificação bem-sucedida, **não é um erro de cálculo**: ele reflete uma característica real dos dados.
 
-O desvio-padrão de leitos por hospital permanece muito alto nos três estratos de natureza jurídica ($S_h$ entre 80,7 e 106,2 — Tabela 1), muito próximo do desvio-padrão da população como um todo ($S\approx98{,}0$). Em outras palavras, existem hospitais muito grandes e muito pequenos **dentro de cada categoria jurídica** privados pequenos e grandes, filantrópicos pequenos e grandes, públicos pequenos e grandes, de modo que a estratificação por natureza jurídica não captura bem a fonte real de variabilidade do número de leitos, que está muito mais associada ao **porte do hospital** do que ao seu regime jurídico.
+O desvio-padrão de leitos por hospital permanece muito alto nos três estratos de natureza jurídica ($S_h$ entre 80,7 e 106,2 -- Tabela 1), muito próximo do desvio-padrão da população como um todo ($S\approx98{,}0$). Em outras palavras, existem hospitais muito grandes e muito pequenos **dentro de cada categoria jurídica** privados pequenos e grandes, filantrópicos pequenos e grandes, públicos pequenos e grandes, de modo que a estratificação por natureza jurídica não captura bem a fonte real de variabilidade do número de leitos, que está muito mais associada ao **porte do hospital** do que ao seu regime jurídico.
 
 A estratificação só reduz substancialmente a variância quando os estratos são internamente mais homogêneos do que a população como um todo; aqui isso ocorre apenas parcialmente. Ainda assim, a alocação de Neyman por reconhecer essa heterogeneidade residual e direcionar mais amostra ao estrato mais disperso (Filantrópico) supera consistentemente a alocação proporcional do ponto de vista teórico, reduzindo a variância em cerca de 2,0% adicionais.
 
-Para trabalhos futuros, um critério de estratificação por **porte do hospital** (por exemplo, faixas/quartis de `LEITOS_EXISTENTES`, eventualmente combinadas com `DS_TIPO_UNIDADE`) tenderia a produzir estratos mais homogêneos internamente e, consequentemente, ganhos de eficiência mais expressivos sobre a AAS do que os obtidos com a natureza jurídica.
+Para trabalhos futuros, um critério de estratificação por **porte do hospital** (por exemplo, faixas/quartis de `LEITOS_EXISTENTES`, eventualmente combinadas com `DS_TIPO_UNIDADE`) tenderia a produzir estratos mais homogêneos internamente e, consequentemente, ganhos de eficiência mais expressivos sobre a AAS do que os obtidos unicamente com a natureza jurídica.
