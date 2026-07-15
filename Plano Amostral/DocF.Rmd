@@ -403,20 +403,28 @@ $$
 
 ## Alocação
 
+```{r, include=FALSE}
+rm(list=c("lista","amostra_neyman","amostra_proporcional","res_ney","res_prop","tab_efic","tab_result"))
+knitr::opts_chunk$set(echo = T,
+                      warning = FALSE)
+```
+
 A população será dividida em 3 estratos: Hospitais públicos, particulares e filantrópicos. A alocação feita será proporcional, como descrito na Tabela 7:
 
-```{r}
+```{r,echo=F}
 Nh <- tapply(leitos_mg$LEITOS_EXISTENTES,leitos_mg$DESC_NATUREZA_JURIDICA,length)
 n=207
 nh=round(n*Nh/662)
-nh=cbind(estratos_nomes,nh)
+nh=data.frame(estratos_nomes,nh)
 colnames(nh)=c("Estrato","$n_h$")
 rownames(nh)=NULL
-kbl(nh,position="h",row.names = NA,
-    align = "lcc",booktabs=T,
+kbl(nh,position="h",
+    align = "cc",booktabs=T,
     escape=F,caption="Alocação proporcional")%>%
   column_spec(1,width="1.5in")
 ```
+
+Além disso, vamos supor que a probabilidade de seleção por unidade seja cerca de $\pi=0.1$. Ou seja, a probabilidade de seleção da unidade elementar deve ser $P_2=0.1N/n=0.3198068$
 
 ### Primeiro estágio: Seleção de Hospitais
 
@@ -437,7 +445,88 @@ amostra= do.call("rbind", amostras.est)
 
 ### Segundo estágio: Seleção de Leitos
 
-Supondo que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, podemos simular um sorteio da seguinte maneira:
+Supondo que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, podemos simular um sorteio aleatório simples da seguinte maneira no R:
+
+```{r}
+set.seed(2026)
+Mij <- lapply(amostras.est,function(x)x$LEITOS_EXISTENTES)
+mij=sapply(1:3, function(h){
+  #arredondamento para cima para evitar exclusao de pequenos conglomerados
+  ceiling(Mij[[h]]*0.1*N/n)})
+seleciona2 <- function(h){
+  Mij=Mij[[h]];mij=mij[[h]]
+  unidades=list(0)
+  for(i in seq_len(nh[h,2])){
+    unidades[[i]]=sample(seq_len(Mij[i]),mij[i])
+  }
+  return(unidades)
+}
+amostra.leitos=sapply(1:3,seleciona2)
+names(amostra.leitos)=estratos_nomes
+```
+
+### Simulação das variáveis
+
+Atribuiremos distribuição Bernoulli a $Y_1$, com probabilidade 80% para ocupação. Assim, simulamos os resultados, com não-resposta de 2% para os conglomerados:
+
+```{r}
+set.seed(2026)
+Y1=list()
+naoresp=list()
+nresp2=list()
+for(h in 1:3){
+  Y1[[h]]=list()
+  naoresp[[h]]=sample(c(F,T),nh[h,2],replace=T,prob=c(0.92,0.02))
+  for(i in seq_len(nh[h,2])){
+    if(naoresp[[h]][i]) Y1[[h]][[i]]=NA
+    else{
+     Y1[[h]][[i]]=numeric(mij[[h]][i])
+    for(u in seq_len(mij[[h]][i]))
+     Y1[[h]][[i]][u]=rbinom(1,size=1,prob=0.8)
+  }}
+}
+names(Y1)=estratos_nomes
+```
+
+Para $Y_2$, as probabilidades de atendimento SUS serão iguais à proporção de alocação de leitos SUS do hospital selecionado.
+
+```{r}
+
+#probabilidades
+psus=lapply(amostras.est,function(estrato){
+  estrato$LEITOS_SUS/estrato$LEITOS_EXISTENTES
+})
+Y2=list()
+for(h in 1:3){
+  Y2[[h]] <- list()
+  for(i in seq_len(nh[h,2])){
+    if(naoresp[[h]][i]) Y1[[h]][[i]]=NA
+    else{
+        ocupados <- Y1[[h]][[i]]==1
+        Y2[[h]][[i]]=numeric(mij[[h]][i])
+        p=psus[[h]][i]
+        for(u in seq_len(mij[[h]][i])){
+          if(ocupados[u])
+            Y2[[h]][[i]][u]=rbinom(1,size=1,p)
+          }
+    }
+  }
+}
+names(Y2)=estratos_nomes
+```
+
+Assim, anexamos os resultados aos conglomerados:
+
+```{r}
+amostra$LEITOS_OCUPADOS=with(Y1,c(sapply(FILANTROPICO,sum),sapply(PRIVADO,sum),sapply(PUBLICO,sum)))
+amostra$LEITOS_OCUSUS=with(Y2,c(sapply(FILANTROPICO,sum),sapply(PRIVADO,sum),sapply(PUBLICO,sum)))
+```
+
+Simularemos não-respostas dentro dos conglomerados que se mantiveram, eliminando 2% dos conglomerados:
+
+```{r}
+
+```
 
 
 # Desenho B: Desenho sem autoponderação
@@ -464,12 +553,6 @@ Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
 
 ```{r}
 set.seed(2026)
-seleciona <- function(h){
-  base.st=leitos_mg[leitos_mg$DESC_NATUREZA_JURIDICA==estratos_nomes[h],]
-  s=sample(seq_len(Nh[h]), size=nh[h,2])
-  return(amostra=base.st[s,])
-}
-
 amostras.est=sapply(1:3,seleciona,simplify=F)
 names(amostras.est)=estratos_nomes
 amostra= do.call("rbind", amostras.est)
