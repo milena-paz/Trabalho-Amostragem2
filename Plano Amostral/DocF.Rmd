@@ -14,11 +14,12 @@ knitr::opts_chunk$set(echo = FALSE,
 
 \newpage
 
+
 # Objetivo
 
 A partir de diversas técnicas de amostragem probabilística, deseja-se obter estimativas relevantes respeito à oferta de leitos totais e disponibilidade de leitos vinculados ao SUS em hospitais de Minas Gerais, com o objetivo de medir a capacidade hospitalar no estado.
 
-# Universo e Unidade de Amostra
+# Primeira Parte: Universo e Unidade de Amostra
 
 Para este estudo nos basearemos no listado pelo @datasus2026, e definimos o seguinte:
 
@@ -148,7 +149,7 @@ variável de interesse não esteja disponível de forma agregada no cadastro.
 
 # 3. Amostragem Estratificada
 
-Este será o desenho escolhido para análise, dado que não temos e nem faz sentido utilizar um listado dos leitos para amostragem por conglomerados, assim como AAS não é efetiva dado que as naturezas jurídicas conferem como estratos com diferentes comportamentos em relação à razão entre leitos SUS e leitos totais.
+Este será o desenho escolhido para análise, dado que não temos e nem faz sentido utilizar um listado dos leitos para amostragem por conglomerados em dois estágios, assim como AAS não é efetiva dado que as naturezas jurídicas conferem como estratos com diferentes comportamentos em relação à razão entre leitos SUS e leitos totais.
 
 ## 3.1 Critério de Estratificação
 
@@ -373,3 +374,105 @@ O desvio-padrão de leitos por hospital permanece muito alto nos três estratos 
 A estratificação só reduz substancialmente a variância quando os estratos são internamente mais homogêneos do que a população como um todo; aqui isso ocorre apenas parcialmente. Ainda assim, a alocação de Neyman por reconhecer essa heterogeneidade residual e direcionar mais amostra ao estrato mais disperso (Filantrópico) supera consistentemente a alocação proporcional do ponto de vista teórico, reduzindo a variância em cerca de 2,0% adicionais.
 
 Para trabalhos futuros, um critério de estratificação por **porte do hospital** (por exemplo, faixas/quartis de `LEITOS_EXISTENTES`, eventualmente combinadas com `DS_TIPO_UNIDADE`) tenderia a produzir estratos mais homogêneos internamente e, consequentemente, ganhos de eficiência mais expressivos sobre a AAS do que os obtidos unicamente com a natureza jurídica.
+
+# Segunda parte: Simulação de Amostragem
+
+Para este exercício de simulação, faremos um plano de amostragem estratificada com AAS no primeiro e segundo estágios. A partir das novas definições de estudo, iremos aplicar correção por taxa de não-resposta e por fim aplicar pesos para obter estimativas. Abaixo estão as definições do plano amostral:
+
+- **População de estudo:** Leitos em hospitais mineiros ativos do mês de janeiro de 2026.
+
+- **Unidade Primária de Amostragem:** Hospitais mineiros ativos selecionados de acordo com o listado pelo DataSUS referente ao mês de janeiro de 2026.
+
+- **Unidade Elementar:** Leitos em hospitais mineiros ativos selecionados de acordo com o listado pelo DataSUS referente ao mês de janeiro de 2026.
+
+- **Variáveis  de interesse:**
+
+  - $Y_1$: *Leitos ocupados* - Número de leitos ocupados no dia da pesquisa de campo simulada.
+  
+  - $Y_2$: *Destinação SUS* - Se o leito é ocupado em atendimento pelo SUS (1= "Sim"; 0= "Não").
+  
+## Tamanho de Amostra
+
+Partindo do valor definido na seção 1.1, aplicaremos correção por taxa de não-resposta $(r=1-0.98\times0.97=0.0494)$:
+
+$$
+n_{sim}=\frac{n}{1-r}=\frac{197}{0.9506}=207.2375\approx207
+$$
+
+# Desenho A: Desenho autoponderado
+
+## Alocação
+
+A população será dividida em 3 estratos: Hospitais públicos, particulares e filantrópicos. A alocação feita será proporcional, como descrito na Tabela 7:
+
+```{r}
+Nh <- tapply(leitos_mg$LEITOS_EXISTENTES,leitos_mg$DESC_NATUREZA_JURIDICA,length)
+n=207
+nh=round(n*Nh/662)
+nh=cbind(estratos_nomes,nh)
+colnames(nh)=c("Estrato","$n_h$")
+rownames(nh)=NULL
+kbl(nh,position="h",row.names = NA,
+    align = "lcc",booktabs=T,
+    escape=F,caption="Alocação proporcional")%>%
+  column_spec(1,width="1.5in")
+```
+
+### Primeiro estágio: Seleção de Hospitais
+
+Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
+
+```{r}
+set.seed(2026)
+seleciona <- function(h){
+  base.st=leitos_mg[leitos_mg$DESC_NATUREZA_JURIDICA==estratos_nomes[h],]
+  s=sample(seq_len(Nh[h]), size=nh[h,2])
+  return(amostra=base.st[s,])
+}
+
+amostras.est=sapply(1:3,seleciona,simplify=F)
+names(amostras.est)=estratos_nomes
+amostra= do.call("rbind", amostras.est)
+```
+
+### Segundo estágio: Seleção de Leitos
+
+Supondo que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, podemos simular um sorteio da seguinte maneira:
+
+
+# Desenho B: Desenho sem autoponderação
+
+## Alocação
+
+A população será dividida em 3 estratos: Hospitais públicos, particulares e filantrópicos. O desenho não será autoponderado já que a alocação será ótima de Neyman, como descrito na Tabela 8.
+
+```{r}
+Sh <- tapply(leitos_mg$LEITOS_EXISTENTES,leitos_mg$DESC_NATUREZA_JURIDICA,sd)
+nh=round(n*tapply(Nh*Sh,1:3,function(x)x/sum(Nh*Sh)))
+nh=cbind(estratos_nomes,nh)
+colnames(nh)=c("Estrato","$n_h$")
+kbl(nh,position="h",
+    align = "lcc",booktabs=T,
+    escape=F,caption="Alocação ótima de Neyman")%>%
+  column_spec(1,width="1.5in")
+```
+
+
+### Primeiro estágio: Seleção de Hospitais
+
+Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
+
+```{r}
+set.seed(2026)
+seleciona <- function(h){
+  base.st=leitos_mg[leitos_mg$DESC_NATUREZA_JURIDICA==estratos_nomes[h],]
+  s=sample(seq_len(Nh[h]), size=nh[h,2])
+  return(amostra=base.st[s,])
+}
+
+amostras.est=sapply(1:3,seleciona,simplify=F)
+names(amostras.est)=estratos_nomes
+amostra= do.call("rbind", amostras.est)
+```
+
+### Segundo estágio: Seleção de Leitos
