@@ -707,7 +707,7 @@ nh=as.numeric(nh[,2])
 
 ### Primeiro estágio: Seleção de Hospitais
 
-Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
+Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato, igual ao desenho A.
 
 ```{r}
 set.seed(2026)
@@ -718,7 +718,7 @@ amostra= do.call("rbind", amostras.est)
 
 ### Segundo estágio: Seleção de Leitos
 
-Como o desenho não é autoponderado, mantemos fixa a fração de amostragem de segundo estágio em $0.1N/n$, a mesma utilizada no Desenho A. A diferença está em que, aqui, a alocação de primeiro estágio já não é proporcional (é a alocação de Neyman), de modo que a probabilidade final de seleção de um leito passa a variar conforme o estrato do hospital sorteado, e não mais um valor constante como em $P_2$ no Desenho A. Supondo, como antes, que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, simulamos o sorteio aleatório simples no R:
+Como o desenho não é autoponderado, mantemos fixa a fração de amostragem de segundo estágio em $0.1N/n$, a mesma utilizada no Desenho A. A diferença está em que, aqui, a alocação de primeiro estágio já não é proporcional (é a alocação de Neyman), de modo que a probabilidade final de seleção de um leito passa a variar conforme o estrato do hospital sorteado, e não mais um valor constante como em $P_2$ no Desenho A. Supondo, como antes, que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, simulamos o sorteio aleatório simples no R.
 
 ```{r}
 set.seed(2026)
@@ -777,7 +777,7 @@ names(Y2)=estratos_nomes
 rm(psus)
 ```
 
-Teremos dados com não-resposta de 2% para os conglomerados. Simularemos também não-respostas dentro dos conglomerados que se mantiveram, eliminando observações com 3% de probabilidade:
+Teremos dados com não-resposta de 2% para os conglomerados. Simularemos também não-respostas dentro dos conglomerados que se mantiveram, eliminando observações com 3% de probabilidade.
 
 ```{r}
 set.seed(2026)
