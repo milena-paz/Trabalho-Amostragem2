@@ -347,6 +347,7 @@ Quanto à proporção de leitos SUS em relação ao núm. de leitos total, temos
 sapply(estratos_nomes,function(e)
   p=sum(amostra_neyman$LEITOS_SUS[amostra_neyman$DESC_NATUREZA_JURIDICA == e])/sum(amostra_neyman$LEITOS_EXISTENTES)
   )
+
 ```
 
 
@@ -405,6 +406,15 @@ $$
 
 ```{r, include=FALSE}
 rm(list=c("lista","amostra_neyman","amostra_proporcional","res_ney","res_prop","tab_efic","tab_result"))
+sum.na <- function(df,peso=1){
+    if (all(is.na(df))){
+        suma <- NA
+    }  
+    else {    
+        suma <- sum(df*peso, na.rm = T)
+    }
+    return(suma)
+}
 knitr::opts_chunk$set(echo = T,
                       warning = FALSE)
 ```
@@ -422,11 +432,12 @@ kbl(nh,position="h",
     align = "cc",booktabs=T,
     escape=F,caption="Alocação proporcional")%>%
   column_spec(1,width="1.5in")
+nh=nh[,2]
 ```
 
 Além disso, vamos supor que a probabilidade de seleção por unidade seja cerca de $\pi=0.1$. Ou seja, a probabilidade de seleção da unidade elementar deve ser $P_2=0.1N/n=0.3198068$
 
-### Primeiro estágio: Seleção de Hospitais
+## Primeiro estágio: Seleção de Hospitais
 
 Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
 
@@ -434,7 +445,7 @@ Fazemos a seleção, por AAS, dos conglomerados dentro de cada estrato. No R:
 set.seed(2026)
 seleciona <- function(h){
   base.st=leitos_mg[leitos_mg$DESC_NATUREZA_JURIDICA==estratos_nomes[h],]
-  s=sample(seq_len(Nh[h]), size=nh[h,2])
+  s=sample(seq_len(Nh[h]), size=nh[h])
   return(amostra=base.st[s,])
 }
 
@@ -443,7 +454,7 @@ names(amostras.est)=estratos_nomes
 amostra= do.call("rbind", amostras.est)
 ```
 
-### Segundo estágio: Seleção de Leitos
+## Segundo estágio: Seleção de Leitos
 
 Supondo que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, podemos simular um sorteio aleatório simples da seguinte maneira no R:
 
@@ -456,7 +467,7 @@ mij=sapply(1:3, function(h){
 seleciona2 <- function(h){
   Mij=Mij[[h]];mij=mij[[h]]
   unidades=list(0)
-  for(i in seq_len(nh[h,2])){
+  for(i in seq_len(nh[h])){
     unidades[[i]]=sample(seq_len(Mij[i]),mij[i])
   }
   return(unidades)
@@ -465,25 +476,24 @@ amostra.leitos=sapply(1:3,seleciona2)
 names(amostra.leitos)=estratos_nomes
 ```
 
-### Simulação das variáveis
+## Simulação das variáveis
 
-Atribuiremos distribuição Bernoulli a $Y_1$, com probabilidade 80% para ocupação. Assim, simulamos os resultados, com não-resposta de 2% para os conglomerados:
+Atribuiremos distribuição Bernoulli a $Y_1$, com probabilidade de 80% para ocupação. Assim, simulamos os resultados:
 
 ```{r}
 set.seed(2026)
 Y1=list()
-naoresp=list()
-nresp2=list()
+nm=round(nh*0.02)
+naoresp=sapply(1:3,function(h){
+  sample(c(rep(F,nh[h]-nm[h]),rep(T,nm[h])),nh[h])
+})
 for(h in 1:3){
   Y1[[h]]=list()
-  naoresp[[h]]=sample(c(F,T),nh[h,2],replace=T,prob=c(0.92,0.02))
-  for(i in seq_len(nh[h,2])){
-    if(naoresp[[h]][i]) Y1[[h]][[i]]=NA
-    else{
+  for(i in seq_len(nh[h])){
      Y1[[h]][[i]]=numeric(mij[[h]][i])
     for(u in seq_len(mij[[h]][i]))
      Y1[[h]][[i]][u]=rbinom(1,size=1,prob=0.8)
-  }}
+  }
 }
 names(Y1)=estratos_nomes
 ```
@@ -491,7 +501,7 @@ names(Y1)=estratos_nomes
 Para $Y_2$, as probabilidades de atendimento SUS serão iguais à proporção de alocação de leitos SUS do hospital selecionado.
 
 ```{r}
-
+set.seed(2026)
 #probabilidades
 psus=lapply(amostras.est,function(estrato){
   estrato$LEITOS_SUS/estrato$LEITOS_EXISTENTES
@@ -499,9 +509,7 @@ psus=lapply(amostras.est,function(estrato){
 Y2=list()
 for(h in 1:3){
   Y2[[h]] <- list()
-  for(i in seq_len(nh[h,2])){
-    if(naoresp[[h]][i]) Y1[[h]][[i]]=NA
-    else{
+  for(i in seq_len(nh[h])){
         ocupados <- Y1[[h]][[i]]==1
         Y2[[h]][[i]]=numeric(mij[[h]][i])
         p=psus[[h]][i]
@@ -511,21 +519,170 @@ for(h in 1:3){
           }
     }
   }
-}
 names(Y2)=estratos_nomes
+rm(psus)
 ```
 
-Assim, anexamos os resultados aos conglomerados:
+Teremos dados com não-resposta de 2% para os conglomerados. Simularemos também não-respostas dentro dos conglomerados que se mantiveram, eliminando observações com 3% de probabilidade:
 
 ```{r}
-amostra$LEITOS_OCUPADOS=with(Y1,c(sapply(FILANTROPICO,sum),sapply(PRIVADO,sum),sapply(PUBLICO,sum)))
-amostra$LEITOS_OCUSUS=with(Y2,c(sapply(FILANTROPICO,sum),sapply(PRIVADO,sum),sapply(PUBLICO,sum)))
+set.seed(2026)
+# amostra.semna=na.omit(amostra)
+for(i in 1:3){
+    for(conglomerado in seq_len(nh[i])){
+      if(conglomerado%in%which(naoresp[[i]]))
+        rep(NA,mij[[i]][conglomerado])->Y1[[i]][[conglomerado]]->Y2[[i]][[conglomerado]]
+      else{
+      nm=mij[[i]][conglomerado]
+      sample(c(T,F),nm,replace=T,prob=c(0.03,0.97))->tmp
+      Y1[[i]][[conglomerado]][tmp]<-NA->Y2[[i]][[conglomerado]][tmp]
+      }
+    }
+}
+rm(i,h,conglomerado,tmp,u,p,ocupados)
 ```
 
-Simularemos não-respostas dentro dos conglomerados que se mantiveram, eliminando 2% dos conglomerados:
+```{r,echo=F}
+nasdentro <- function(x){
+  sum(is.na(x))
+}
+wh=with(Y1,c(sapply(FILANTROPICO,nasdentro),
+                                sapply(PRIVADO,nasdentro),
+                                sapply(PUBLICO,nasdentro)))
+wh=unlist(mij)/(unlist(mij)-wh)
+wh[is.infinite(wh)] <- 1
+amostra$LEITOS_OCUPADOS=with(Y1,c(sapply(FILANTROPICO,sum.na,peso=wh[1:106]),
+                                  sapply(PRIVADO,sum.na,peso=wh[107:149]),
+                                  sapply(PUBLICO,sum.na,peso=wh[150:207])))
+amostra$LEITOS_OCUSUS=with(Y2,c(sapply(FILANTROPICO,sum.na,peso=wh[1:106]),
+                                  sapply(PRIVADO,sum.na,peso=wh[107:149]),
+                                  sapply(PUBLICO,sum.na,peso=wh[150:207])))
+```
+
+```{r, include=FALSE}
+rm(list=c("lista","amostra_neyman","amostra_proporcional","res_ney","res_prop","tab_efic","tab_result"))
+knitr::opts_chunk$set(echo = F,
+                      warning = FALSE)
+```
+
+## Estimação e Inferência
+
+A partir dos dados gerados, podemos fazer estimações para $Y_1$ e $Y_2$. Como o desenho é autoponderado, não é necessário uso de pesos amostrais a respeito desse quesito, e sim apenas para as não-respostas. Dentro de cada estrato h, temos:
+
+$$
+w_{ih}=N/n\frac{m_{ih}}{\sum^{n_h}_{j}m^*_{jh}},
+$$
+
+onde $m^*_{jh}$ são número de observações não faltantes no conglomerado j dentro do estrato h e $m_{ih}$ o total de unidades dentro do conglomerado i.
+
+
+```{r,message=F}
+library(survey)
+pesor=wh*N/n
+desenho <- svydesign(
+  ids = ~1,        # Variável de conglomerados (PSU)
+  strata = ~DESC_NATUREZA_JURIDICA,          # Variável de estratificação
+  weights = ~wh,   # Pesos amostrais
+  data = amostra  # Seu dataframe
+)
+
+media_estrato <- svyby(
+  formula = ~LEITOS_OCUPADOS, 
+  by = ~DESC_NATUREZA_JURIDICA, 
+  design = desenho, 
+  FUN = svymean,
+  na.rm=T
+)
+y1hbarra=media_estrato$LEITOS_OCUPADOS
+s1h=media_estrato$se
+y1=data.frame(
+  y1hbarra,
+  y1hbarra-1.96*s1h,
+  y1hbarra+1.96*s1h
+)
+rownames(y1)=estratos_nomes
+kbl(y1,position="h",col.names = c("$\\bar{Y}_{1h}$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+    align = "ccc",booktabs=T,
+    escape=F,caption="Leitos Ocupados Médio por Estrato")%>%
+  column_spec(1:3,width="1.2in")
+```
 
 ```{r}
+media <- svymean(
+  x = ~LEITOS_OCUPADOS,
+  design = desenho,
+  na.rm=T
+)
+s1h<- svyvar(
+  x = ~LEITOS_OCUPADOS,
+  design = desenho,
+  na.rm=T
+)
+y1=data.frame(
+  media[1],
+  media[1]-1.96*sqrt(s1h[1]),
+  media[1]+1.96*sqrt(s1h[1])
+)
+rownames(y1)=NULL
+kbl(y1,position="h",col.names = c("$\\bar{Y}_1$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+     align = "ccc",booktabs=T,
+     escape=F,caption="Leitos Ocupados Médio")%>%
+   column_spec(1,width="1.2in")
+```
 
+```{r,message=F}
+library(survey)
+
+desenho <- svydesign(
+  ids = ~1,        # Variável de conglomerados (PSU)
+  strata = ~DESC_NATUREZA_JURIDICA,          # Variável de estratificação
+  weights = ~wh,   # Pesos amostrais
+  data = amostra  # Seu dataframe
+)
+
+media_estrato <- svyby(
+  formula = ~LEITOS_OCUSUS, 
+  by = ~DESC_NATUREZA_JURIDICA, 
+  design = desenho, 
+  FUN = svymean,
+  na.rm=T
+)
+y1hbarra=media_estrato$LEITOS_OCUSUS
+s1h=media_estrato$se
+y1=data.frame(
+  y1hbarra,
+  y1hbarra-1.96*s1h,
+  y1hbarra+1.96*s1h
+)
+rownames(y1)=estratos_nomes
+kbl(y1,position="h",col.names = c("$\\bar{Y}_{1h}$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+    align = "ccc",booktabs=T,
+    escape=F,caption="Leitos Ocupados em atendimento SUS Médio por estrato")%>%
+  column_spec(1:3,width="1.2in")
+```
+
+```{r}
+media <- svymean(
+  x = ~LEITOS_OCUSUS,
+  design = desenho,
+  na.rm=T
+)
+s1h<- svyvar(
+  x = ~LEITOS_OCUSUS,
+  design = desenho,
+  na.rm=T
+)
+y1=data.frame(
+  media[1],
+  media[1]-1.96*sqrt(s1h[1]),
+  media[1]+1.96*sqrt(s1h[1])
+)
+rownames(y1)=NULL
+kbl(y1,col.names = c("$\\bar{Y}_1$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+     align = "ccc",booktabs=T,
+     escape=F,caption="Leitos Ocupados em atendimento SUS Médio")%>%
+   column_spec(1,width="1.2in")%>%
+  kable_styling(latex_options = "HOLD_position")
 ```
 
 
@@ -544,6 +701,7 @@ kbl(nh,position="h",
     align = "lcc",booktabs=T,
     escape=F,caption="Alocação ótima de Neyman")%>%
   column_spec(1,width="1.5in")
+nh=as.numeric(nh[,2])
 ```
 
 
@@ -559,3 +717,223 @@ amostra= do.call("rbind", amostras.est)
 ```
 
 ### Segundo estágio: Seleção de Leitos
+
+Como o desenho não é autoponderado, mantemos fixa a fração de amostragem de segundo estágio em $0.1N/n$, a mesma utilizada no Desenho A. A diferença está em que, aqui, a alocação de primeiro estágio já não é proporcional (é a alocação de Neyman), de modo que a probabilidade final de seleção de um leito passa a variar conforme o estrato do hospital sorteado, e não mais um valor constante como em $P_2$ no Desenho A. Supondo, como antes, que tenhamos acesso a uma lista com todos os $m_{ij}$ leitos do conglomerado i dentro do estrato j, simulamos o sorteio aleatório simples no R:
+
+```{r}
+set.seed(2026)
+Mij <- lapply(amostras.est,function(x)x$LEITOS_EXISTENTES)
+mij=sapply(1:3, function(h){
+  #arredondamento para cima para evitar exclusao de pequenos conglomerados
+  ceiling(Mij[[h]]*0.1*N/n)})
+amostra.leitos=sapply(1:3,seleciona2)
+names(amostra.leitos)=estratos_nomes
+```
+
+### Simulação das variáveis
+
+Atribuiremos distribuição Bernoulli a $Y_1$, com probabilidade de 80% para ocupação. Assim, simulamos os resultados.
+
+```{r}
+set.seed(2026)
+Y1=list()
+nm=round(nh*0.02)
+naoresp=sapply(1:3,function(h){
+  sample(c(rep(F,nh[h]-nm[h]),rep(T,nm[h])),nh[h])
+})
+for(h in 1:3){
+  Y1[[h]]=list()
+  for(i in seq_len(nh[h])){
+     Y1[[h]][[i]]=numeric(mij[[h]][i])
+    for(u in seq_len(mij[[h]][i]))
+     Y1[[h]][[i]][u]=rbinom(1,size=1,prob=0.8)
+  }
+}
+names(Y1)=estratos_nomes
+```
+
+Para $Y_2$, as probabilidades de atendimento SUS serão iguais à proporção de alocação de leitos SUS do hospital selecionado.
+
+```{r}
+set.seed(2026)
+#probabilidades
+psus=lapply(amostras.est,function(estrato){
+  estrato$LEITOS_SUS/estrato$LEITOS_EXISTENTES
+})
+Y2=list()
+for(h in 1:3){
+  Y2[[h]] <- list()
+  for(i in seq_len(nh[h])){
+        ocupados <- Y1[[h]][[i]]==1
+        Y2[[h]][[i]]=numeric(mij[[h]][i])
+        p=psus[[h]][i]
+        for(u in seq_len(mij[[h]][i])){
+          if(ocupados[u])
+            Y2[[h]][[i]][u]=rbinom(1,size=1,p)
+          }
+    }
+  }
+names(Y2)=estratos_nomes
+rm(psus)
+```
+
+Teremos dados com não-resposta de 2% para os conglomerados. Simularemos também não-respostas dentro dos conglomerados que se mantiveram, eliminando observações com 3% de probabilidade:
+
+```{r}
+set.seed(2026)
+# amostra.semna=na.omit(amostra)
+for(i in 1:3){
+    for(conglomerado in seq_len(nh[i])){
+      if(conglomerado%in%which(naoresp[[i]]))
+        rep(NA,mij[[i]][conglomerado])->Y1[[i]][[conglomerado]]->Y2[[i]][[conglomerado]]
+      else{
+      nm=mij[[i]][conglomerado]
+      sample(c(T,F),nm,replace=T,prob=c(0.03,0.97))->tmp
+      Y1[[i]][[conglomerado]][tmp]<-NA->Y2[[i]][[conglomerado]][tmp]
+      }
+    }
+}
+rm(i,h,conglomerado,tmp,u,p,ocupados)
+```
+
+```{r,echo=F}
+nasdentro <- function(x){
+  sum(is.na(x))
+}
+wh=with(Y1,c(sapply(FILANTROPICO,nasdentro),
+                                sapply(PRIVADO,nasdentro),
+                                sapply(PUBLICO,nasdentro)))
+wh=unlist(mij)/(unlist(mij)-wh)
+wh[is.infinite(wh)] <- 1
+amostra$LEITOS_OCUPADOS=with(Y1,c(sapply(FILANTROPICO,sum.na,peso=wh[1:106]),
+                                  sapply(PRIVADO,sum.na,peso=wh[107:149]),
+                                  sapply(PUBLICO,sum.na,peso=wh[150:207])))
+amostra$LEITOS_OCUSUS=with(Y2,c(sapply(FILANTROPICO,sum.na,peso=wh[1:106]),
+                                  sapply(PRIVADO,sum.na,peso=wh[107:149]),
+                                  sapply(PUBLICO,sum.na,peso=wh[150:207])))
+```
+
+
+## Estimação e Inferência
+
+A partir dos dados gerados, podemos fazer estimações para $Y_1$ e $Y_2$. Como o desenho não é autoponderado, é necessário uso de pesos amostrais para corrigir por isso, além das não-respostas. Dentro de cada estrato h, temos:
+
+$$
+w_{ih}=N/n\frac{m_{ih}}{\sum^{n_h}_{j}m^*_{jh}}N_h/n_h,
+$$
+
+onde $m^*_{jh}$ são número de observações não faltantes no conglomerado j dentro do estrato h e $m_{ih}$ o total de unidades dentro do conglomerado i.
+
+
+```{r,message=F}
+library(survey)
+pesor=wh*N/n
+pesor[1:116]=pesor[1:116]*(Nh/nh)[1]
+pesor[117:158]=pesor[117:158]*(Nh/nh)[2]
+pesor[159:207]=pesor[1:116]*(Nh/nh)[3]
+desenho <- svydesign(
+  ids = ~1,        # Variável de conglomerados (PSU)
+  strata = ~DESC_NATUREZA_JURIDICA,          # Variável de estratificação
+  weights = ~wh,   # Pesos amostrais
+  data = amostra  # Seu dataframe
+)
+
+media_estrato <- svyby(
+  formula = ~LEITOS_OCUPADOS, 
+  by = ~DESC_NATUREZA_JURIDICA, 
+  design = desenho, 
+  FUN = svymean,
+  na.rm=T
+)
+y1hbarra=media_estrato$LEITOS_OCUPADOS
+s1h=media_estrato$se
+y1=data.frame(
+  y1hbarra,
+  y1hbarra-1.96*s1h,
+  y1hbarra+1.96*s1h
+)
+rownames(y1)=estratos_nomes
+kbl(y1,position="h",col.names = c("$\\bar{Y}_{1h}$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+    align = "ccc",booktabs=T,
+    escape=F,caption="Leitos Ocupados Médio por Estrato")%>%
+  column_spec(1:3,width="1.2in")
+```
+
+```{r}
+media <- svymean(
+  x = ~LEITOS_OCUPADOS,
+  design = desenho,
+  na.rm=T
+)
+s1h<- svyvar(
+  x = ~LEITOS_OCUPADOS,
+  design = desenho,
+  na.rm=T
+)
+y1=data.frame(
+  media[1],
+  media[1]-1.96*sqrt(s1h[1]),
+  media[1]+1.96*sqrt(s1h[1])
+)
+rownames(y1)=NULL
+kbl(y1,position="h",col.names = c("$\\bar{Y}_1$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+     align = "ccc",booktabs=T,
+     escape=F,caption="Leitos Ocupados Médio")%>%
+   column_spec(1,width="1.2in")
+```
+
+```{r,message=F}
+library(survey)
+
+desenho <- svydesign(
+  ids = ~1,        # Variável de conglomerados (PSU)
+  strata = ~DESC_NATUREZA_JURIDICA,          # Variável de estratificação
+  weights = ~wh,   # Pesos amostrais
+  data = amostra  # Seu dataframe
+)
+
+media_estrato <- svyby(
+  formula = ~LEITOS_OCUSUS, 
+  by = ~DESC_NATUREZA_JURIDICA, 
+  design = desenho, 
+  FUN = svymean,
+  na.rm=T
+)
+y1hbarra=media_estrato$LEITOS_OCUSUS
+s1h=media_estrato$se
+y1=data.frame(
+  y1hbarra,
+  y1hbarra-1.96*s1h,
+  y1hbarra+1.96*s1h
+)
+rownames(y1)=estratos_nomes
+kbl(y1,position="h",col.names = c("$\\bar{Y}_{1h}$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+    align = "ccc",booktabs=T,
+    escape=F,caption="Leitos Ocupados em atendimento SUS Médio por estrato")%>%
+  column_spec(1:3,width="1.2in")
+```
+
+
+```{r}
+media <- svymean(
+  x = ~LEITOS_OCUSUS,
+  design = desenho,
+  na.rm=T
+)
+s1h<- svyvar(
+  x = ~LEITOS_OCUSUS,
+  design = desenho,
+  na.rm=T
+)
+y1=data.frame(
+  media[1],
+  media[1]-1.96*sqrt(s1h[1]),
+  media[1]+1.96*sqrt(s1h[1])
+)
+rownames(y1)=NULL
+kbl(y1,col.names = c("$\\bar{Y}_1$","$IC_{95\\%}$ Inferior","$IC_{95\\%}$ Superior"),
+     align = "ccc",booktabs=T,
+     escape=F,caption="Leitos Ocupados em atendimento SUS Médio")%>%
+   column_spec(1,width="1.2in")%>%
+  kable_styling(latex_options = "HOLD_position")
+```

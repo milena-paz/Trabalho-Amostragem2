@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.5.9)  15 JUL 2026 16:36
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.5.9)  16 JUL 2026 18:24
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -644,25 +644,33 @@ LaTeX Warning: `h' float specifier changed to `ht'.
 [6]
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 686.
-[7] [8] [9] (./DocF.aux)
+[7] [8]
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+[9]
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+[10] [11] (./DocF.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-03-20>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 15675 strings out of 469264
- 251529 string characters out of 5462054
- 714818 words of memory out of 5000000
- 44073 multiletter control sequences out of 15000+600000
+ 15703 strings out of 469264
+ 251946 string characters out of 5462054
+ 717458 words of memory out of 5000000
+ 44088 multiletter control sequences out of 15000+600000
  676255 words of font info for 138 fonts, out of 8000000 for 9000
  38 hyphenation exceptions out of 8191
- 83i,10n,93p,1038b,526s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 83i,13n,93p,1038b,526s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmex10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi5.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr12.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr5.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy7.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtk10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb><c:/Users/Micro/AppData/Roaming/TinyTeX/texmf-dist/fonts/type1/public/lm/lmtti10.pfb>
-Output written on DocF.pdf (10 pages, 318860 bytes).
+Output written on DocF.pdf (12 pages, 326891 bytes).
 PDF statistics:
- 281 PDF objects out of 1000 (max. 8388607)
- 230 compressed objects within 3 object streams
- 51 named destinations out of 1000 (max. 500000)
- 26846 words of extra memory for PDF output out of 29859 (max. 10000000)
+ 311 PDF objects out of 1000 (max. 8388607)
+ 258 compressed objects within 3 object streams
+ 64 named destinations out of 1000 (max. 500000)
+ 26870 words of extra memory for PDF output out of 29859 (max. 10000000)
 
